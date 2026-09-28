@@ -1,0 +1,1 @@
+Feature showcase of the Zibo app's Mood Tracker module: Don't ignore your feelings. Track them. Features: Pick today's mood emoji, Weekly & monthly trends, Add a short note if you like. Soft call to action to download.

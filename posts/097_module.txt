@@ -1,0 +1,1 @@
+Feature showcase of the Zibo app's Gratitude Journal module: Remember what you already have. Features: Write 3 things a day, Look back at past entries, +5 Zibo Coins every day. Soft call to action to download.

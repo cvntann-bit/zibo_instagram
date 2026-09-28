@@ -1,0 +1,12 @@
+# gizli anahtarlar ASLA depoya girmez
+.env
+tokens.json
+# yerel dosyalar
+*.exe
+bot.log
+*.tmp
+__pycache__/
+build/
+dist/
+ZiboBot_Uygulama/
+ZiboBot.spec

@@ -1,0 +1,1 @@
+Streak Freeze feature: protects the user's streak if they miss a day.

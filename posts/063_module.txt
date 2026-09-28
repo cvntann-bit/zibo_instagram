@@ -1,0 +1,1 @@
+Feature showcase of the Zibo app's Money & Savings module: Track your expenses, savings and income. Features: Expenses, savings & income, Clear trend charts, Multiple currencies. Soft call to action to download.

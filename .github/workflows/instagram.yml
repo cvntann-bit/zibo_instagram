@@ -1,0 +1,53 @@
+name: Zibo Instagram paylaşımı
+
+on:
+  schedule:
+    # Saatler UTC. İstanbul = UTC+3 → 17:07 UTC = 20:07 İstanbul, 23:07 UTC = 02:07 İstanbul.
+    # Dakika bilerek :07 — GitHub :00/:15/:30/:45'te yoğunluktan cron'ları geciktiriyor/atlıyor.
+    - cron: "7 17 * * *"
+    - cron: "7 23 * * *"
+  workflow_dispatch: {}   # GitHub'da "Run workflow" = şimdi paylaş
+
+permissions:
+  contents: write
+
+concurrency:
+  group: instagram-bot
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Paketleri kur
+        run: pip install -r requirements.txt
+
+      - name: Sıradaki postu paylaş
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          FIXED_HASHTAGS: ziboapp
+          DEFAULT_PLATFORMS: instagram
+        run: python main.py --once
+
+      - name: Durumu depoya kaydet
+        if: always()
+        run: |
+          git config user.name "zibo-bot"
+          git config user.email "zibo-bot@users.noreply.github.com"
+          git add posts.json state.json 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Paylaşım durumu güncellendi [skip ci]"
+            git pull --rebase
+            git push
+          fi
