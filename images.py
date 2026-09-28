@@ -58,13 +58,38 @@ def _upload_imgbb(data: bytes, name: str) -> str:
     return body["data"]["url"]
 
 
-def public_url(path: str, rel_name: str) -> str:
+def _upload_catbox(data: bytes, name: str, temporary: bool) -> str:
+    """Anahtar gerektirmez. temporary=True -> litterbox (24 saat sonra silinir)."""
+    if temporary:
+        url, extra = "https://litterbox.catbox.moe/resources/internals/api.php", {"time": "24h"}
+    else:
+        url, extra = "https://catbox.moe/user/api.php", {}
+    resp = requests.post(url, data={"reqtype": "fileupload", **extra},
+                         files={"fileToUpload": (name + ".jpg", data, "image/jpeg")},
+                         headers={"User-Agent": "ZiboBot/1.0"}, timeout=120)
+    link = resp.text.strip()
+    if resp.status_code != 200 or not link.startswith("https://"):
+        raise RuntimeError(f"catbox yükleme hatası: HTTP {resp.status_code} {link[:200]}")
+    return link
+
+
+# Instagram bazı sitelerden fotoğrafı indiremiyor (ör. i.ibb.co). Sırayla denenir.
+def hosts() -> list:
+    raw = os.getenv("IMAGE_HOSTS") or os.getenv("IMAGE_HOST") or "litterbox,catbox,imgbb"
+    return [h.strip() for h in raw.split(",") if h.strip()]
+
+
+def public_url(path: str, rel_name: str, host: str = None) -> str:
     """path: yerel dosya, rel_name: posts/ içindeki göreli ad (static mod için)."""
-    host = os.getenv("IMAGE_HOST", "imgbb")
+    host = host or hosts()[0]
     if host == "static":
         base = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
         if not base:
             raise RuntimeError("IMAGE_HOST=static için PUBLIC_BASE_URL gerekli")
         return f"{base}/{rel_name}"
     stem = os.path.splitext(os.path.basename(path))[0]
-    return _upload_imgbb(prepare_jpeg(path), stem)
+    if host in ("litterbox", "catbox"):
+        return _upload_catbox(prepare_jpeg(path), stem, temporary=(host == "litterbox"))
+    if host == "imgbb":
+        return _upload_imgbb(prepare_jpeg(path), stem)
+    raise RuntimeError(f"Bilinmeyen IMAGE_HOST: {host}")

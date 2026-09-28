@@ -234,13 +234,32 @@ def publish_to(platform: str, item: dict, dry_run: bool) -> str:
         return "dry-run"
 
     import images
-    urls = [images.public_url(os.path.join(POSTS_DIR, f), f) for f in files]
 
     if platform == "instagram":
         from instagram import InstagramClient
         ig = InstagramClient(os.getenv("IG_USER_ID", ""), os.environ["IG_ACCESS_TOKEN"],
                              os.getenv("IG_API_VERSION", "v23.0"))
-        return ig.publish_carousel(urls, caption) if len(urls) > 1 else ig.publish_image(urls[0], caption)
+        # Instagram fotoğrafı bir siteden indiremezse (2207052 / "could not be fetched") sıradaki siteyle dene
+        last_err = None
+        for host in images.hosts():
+            try:
+                urls = [images.public_url(os.path.join(POSTS_DIR, f), f, host) for f in files]
+            except Exception as e:
+                log.warning("%s yükleme olmadı, sıradaki deneniyor: %s", host, e)
+                last_err = e
+                continue
+            try:
+                return ig.publish_carousel(urls, caption) if len(urls) > 1 else ig.publish_image(urls[0], caption)
+            except Exception as e:
+                msg = str(e)
+                if "2207052" in msg or "could not be fetched" in msg or "media type" in msg:
+                    log.warning("Instagram %s linkini indiremedi, sıradaki deneniyor", host)
+                    last_err = e
+                    continue
+                raise
+        raise last_err or RuntimeError("Hiçbir fotoğraf sitesi çalışmadı")
+
+    urls = [images.public_url(os.path.join(POSTS_DIR, f), f) for f in files]
 
     if platform == "tiktok":
         if os.getenv("IMAGE_HOST", "imgbb") != "static":
