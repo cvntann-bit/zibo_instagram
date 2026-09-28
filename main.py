@@ -28,6 +28,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Anahtarlarda kopyala-yapıştırdan kalan boşluk/satır sonu olursa API "Connection error" verir; temizle.
+for _k in ("ANTHROPIC_API_KEY", "IMGBB_API_KEY", "IG_ACCESS_TOKEN", "IG_USER_ID"):
+    if os.environ.get(_k):
+        os.environ[_k] = "".join(os.environ[_k].split())
+
 POSTS_DIR = os.getenv("POSTS_DIR", "posts")
 POSTS_JSON = os.getenv("POSTS_JSON", "posts.json")
 STATE_FILE = os.getenv("STATE_FILE", "state.json")
