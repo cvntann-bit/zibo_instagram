@@ -25,13 +25,21 @@
     "files": [
       "002_quote.jpg"
     ],
-    "caption": "",
-    "hashtags": [],
+    "caption": "Good moods are made for chasing goals 🎯 Let's put that energy to work, buddy.",
+    "hashtags": [
+      "motivation",
+      "goalsetting",
+      "habits",
+      "selfcare",
+      "positivity",
+      "mindset",
+      "productivity",
+      "digitalbuddy"
+    ],
     "platforms": [
       "instagram"
     ],
-    "approved": true,
-    "caption_error": "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CfWHzMvmVdgejx1c3ttoi'}"
+    "approved": true
   },
   {
     "id": "003_quote.jpg",
