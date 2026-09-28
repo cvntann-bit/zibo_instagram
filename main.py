@@ -142,10 +142,13 @@ def _read_note(path: str) -> str:
     return ""
 
 
-def scan(dry_run: bool) -> None:
+def scan(dry_run: bool, max_captions: int = 0) -> None:
+    """max_captions > 0 ise bu çalıştırmada en fazla o kadar açıklama üretir
+    (GitHub Actions'ta 150 postu tek seferde yazıp süreyi aşmamak için)."""
     posts = load_posts()
     by_id = {p["id"]: p for p in posts}
     changed = False
+    made = tried = 0
 
     for found in discover():
         item = by_id.get(found["id"])
@@ -159,6 +162,9 @@ def scan(dry_run: bool) -> None:
 
         if item.get("caption"):
             continue
+        if max_captions and (made >= max_captions or tried >= max_captions + 2):
+            continue
+        tried += 1
         note = item.get("note") or _read_note(found["note_path"])
         if dry_run:
             log.info("[DRY] %s için açıklama üretilecek (not: %s)", item["id"], note or "-")
@@ -169,6 +175,8 @@ def scan(dry_run: bool) -> None:
             item["caption"], item["hashtags"] = gen["caption"], gen["hashtags"]
             item.pop("caption_error", None)
             changed = True
+            made += 1
+            _write_json(POSTS_JSON, posts)  # her açıklamadan sonra kaydet, iş yarıda kesilse de kaybolmasın
             log.info("Açıklama üretildi: %s -> %s", item["id"], gen["caption"][:60])
         except Exception as e:
             item["caption_error"] = str(e)[:300]
@@ -304,7 +312,7 @@ def main() -> None:
     if args.scan:
         return scan(dry)
     if args.once:
-        scan(dry)
+        scan(dry, max_captions=1)  # sadece sıradaki post için açıklama yaz
         item = next_queue_item(load_posts(), state)
         if not item:
             log.info("Kuyrukta hazır gönderi yok")
