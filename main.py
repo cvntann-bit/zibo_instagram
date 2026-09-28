@@ -311,6 +311,8 @@ def main() -> None:
     args = ap.parse_args()
     dry = args.dry_run or os.getenv("DRY_RUN") == "1"
     state = load_state()
+    if not dry and not os.path.exists(STATE_FILE):
+        save_state(state)  # GitHub'daki "git add posts.json state.json" ikisi de var olmazsa hiçbir şey kaydetmiyor
 
     if args.status:
         return status(state)
