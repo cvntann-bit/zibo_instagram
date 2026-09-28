@@ -31,7 +31,10 @@ load_dotenv()
 # Anahtarlarda kopyala-yapıştırdan kalan boşluk/satır sonu olursa API "Connection error" verir; temizle.
 for _k in ("ANTHROPIC_API_KEY", "IMGBB_API_KEY", "IG_ACCESS_TOKEN", "IG_USER_ID"):
     if os.environ.get(_k):
-        os.environ[_k] = "".join(os.environ[_k].split())
+        _v = "".join(os.environ[_k].split())
+        if _v.startswith(_k + "="):  # "ANTHROPIC_API_KEY=sk-..." diye satırın tamamı yapıştırıldıysa
+            _v = _v[len(_k) + 1:]
+        os.environ[_k] = _v
 
 POSTS_DIR = os.getenv("POSTS_DIR", "posts")
 POSTS_JSON = os.getenv("POSTS_JSON", "posts.json")
