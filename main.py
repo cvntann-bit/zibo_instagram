@@ -170,6 +170,8 @@ def scan(dry_run: bool, max_captions: int = 0) -> None:
 
         if item.get("caption"):
             continue
+        if max_captions < 0:  # -1 = sadece yeni postları listeye ekle, açıklama yazma
+            continue
         if max_captions and (made >= max_captions or tried >= max_captions + 2):
             continue
         tried += 1
@@ -206,6 +208,51 @@ def pending_platforms(item: dict, state: dict) -> list:
     return [p for p in item.get("platforms", DEFAULT_PLATFORMS)
             if done.get(p, {}).get("status") != "done"
             and done.get(p, {}).get("attempts", 0) < MAX_ATTEMPTS]
+
+
+QUEUE_ORDER = os.getenv("QUEUE_ORDER", "zigzag")  # zigzag | sirali | karisik
+
+
+def pick_next(posts: list, state: dict, skip=()):
+    """Paylaşılacak sıradaki post. zigzag: bir baştan (eski), bir sondan (yeni) sırayla."""
+    import random
+    cands = [i for i in posts
+             if not i.get("publish_at") and i.get("approved", True) and i["id"] not in skip
+             and i.get("caption_attempts", 0) < MAX_ATTEMPTS and pending_platforms(i, state)
+             and all(os.path.isfile(os.path.join(POSTS_DIR, f)) for f in item_files(i))]
+    if not cands:
+        return None
+    if QUEUE_ORDER == "sirali":
+        return cands[0]
+    if QUEUE_ORDER == "karisik":
+        return random.choice(cands)
+    return cands[-1] if state.get("flip", 0) % 2 else cands[0]
+
+
+def ensure_caption(item: dict, posts: list, dry_run: bool) -> bool:
+    """Açıklaması yoksa sadece bu post için üretir. Başarılıysa True."""
+    if item.get("caption"):
+        return True
+    if dry_run:
+        log.info("[DRY] %s için açıklama üretilecek", item["id"])
+        return False
+    try:
+        import captioner
+        first = item_files(item)[0]
+        note = item.get("note") or _read_note(os.path.join(POSTS_DIR, os.path.splitext(first)[0] + ".txt")) \
+            if "/" not in first else _read_note(os.path.join(POSTS_DIR, first.split("/")[0], "not.txt"))
+        gen = captioner.generate([os.path.join(POSTS_DIR, f) for f in item_files(item)], note)
+        item["caption"], item["hashtags"] = gen["caption"], gen["hashtags"]
+        item.pop("caption_error", None)
+        log.info("Açıklama üretildi: %s -> %s", item["id"], gen["caption"][:60])
+        ok = True
+    except Exception as e:
+        item["caption_error"] = str(e)[:300]
+        item["caption_attempts"] = item.get("caption_attempts", 0) + 1
+        log.error("Açıklama üretilemedi (%s): %s", item["id"], e)
+        ok = False
+    _write_json(POSTS_JSON, posts)
+    return ok
 
 
 def next_queue_item(posts: list, state: dict):
@@ -341,11 +388,24 @@ def main() -> None:
     if args.scan:
         return scan(dry)
     if args.once:
-        scan(dry, max_captions=1)  # sadece sıradaki post için açıklama yaz
-        item = next_queue_item(load_posts(), state)
+        scan(dry, max_captions=-1)  # yeni postları listeye ekle (açıklamayı aşağıda sadece seçilene yazar)
+        posts = load_posts()
+        item, tried = None, set()
+        for _ in range(3):  # açıklaması üretilemezse başka bir post dene
+            cand = pick_next(posts, state, tried)
+            if not cand:
+                break
+            if ensure_caption(cand, posts, dry):
+                item = cand
+                break
+            tried.add(cand["id"])
         if not item:
             log.info("Kuyrukta hazır gönderi yok")
             return 0
+        log.info("Sıra (%s, %s): %s", QUEUE_ORDER, "sondan" if state.get("flip", 0) % 2 else "baştan", item["id"])
+        if not dry:
+            state["flip"] = state.get("flip", 0) + 1
+            save_state(state)
         post_item(item, state, dry)
         failed = [p for p, r in state["posts"].get(item["id"], {}).items() if r.get("status") == "failed"]
         return 1 if failed and not dry else 0  # GitHub Actions hata e-postası atsın
