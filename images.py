@@ -9,6 +9,8 @@ Kendi sunucun/bucket'ın varsa IMAGE_HOST=static ve PUBLIC_BASE_URL kullan.
 import base64
 import io
 import os
+import time
+from urllib.parse import quote
 
 import requests
 from PIL import Image, ImageOps
@@ -64,18 +66,52 @@ def _upload_catbox(data: bytes, name: str, temporary: bool) -> str:
         url, extra = "https://litterbox.catbox.moe/resources/internals/api.php", {"time": "24h"}
     else:
         url, extra = "https://catbox.moe/user/api.php", {}
-    resp = requests.post(url, data={"reqtype": "fileupload", **extra},
-                         files={"fileToUpload": (name + ".jpg", data, "image/jpeg")},
+    last = ""
+    for attempt in range(3):  # bu siteler ara sıra 500 veriyor, birkaç kez dene
+        try:
+            resp = requests.post(url, data={"reqtype": "fileupload", **extra},
+                                 files={"fileToUpload": (name + ".jpg", data, "image/jpeg")},
+                                 headers={"User-Agent": "ZiboBot/1.0"}, timeout=120)
+            link = resp.text.strip()
+            if resp.status_code == 200 and link.startswith("https://"):
+                return link
+            last = f"HTTP {resp.status_code} {link[:120]}"
+        except requests.RequestException as e:
+            last = str(e)[:120]
+        time.sleep(5)
+    raise RuntimeError(f"catbox yükleme hatası: {last}")
+
+
+def _upload_uguu(data: bytes, name: str) -> str:
+    """Anahtar gerektirmez, dosya birkaç saat sonra silinir."""
+    resp = requests.post("https://uguu.se/upload", files={"files[]": (name + ".jpg", data, "image/jpeg")},
                          headers={"User-Agent": "ZiboBot/1.0"}, timeout=120)
-    link = resp.text.strip()
-    if resp.status_code != 200 or not link.startswith("https://"):
-        raise RuntimeError(f"catbox yükleme hatası: HTTP {resp.status_code} {link[:200]}")
-    return link
+    try:
+        return resp.json()["files"][0]["url"]
+    except Exception:
+        raise RuntimeError(f"uguu yükleme hatası: HTTP {resp.status_code} {resp.text[:120]}")
+
+
+def _github_raw(path: str, rel_name: str) -> str:
+    """Depo herkese açıksa (public) fotoğraf doğrudan GitHub'dan verilir. En güvenilir yol."""
+    repo = os.getenv("GITHUB_REPOSITORY")
+    if not repo:
+        raise RuntimeError("GitHub dışında çalışıyor")
+    img = Image.open(path)
+    w, h = img.size
+    if img.format != "JPEG" or not (MIN_RATIO <= w / h <= MAX_RATIO) or w > MAX_WIDTH:
+        raise RuntimeError("fotoğraf Instagram ölçüsünde değil, başka siteye yüklenecek")
+    ref = os.getenv("GITHUB_SHA") or "main"
+    posts_dir = os.getenv("POSTS_DIR", "posts").strip("/")
+    url = f"https://raw.githubusercontent.com/{repo}/{ref}/{quote(posts_dir + '/' + rel_name)}"
+    if requests.head(url, timeout=30).status_code != 200:
+        raise RuntimeError("depo gizli (private), GitHub linki kullanılamıyor")
+    return url
 
 
 # Instagram bazı sitelerden fotoğrafı indiremiyor (ör. i.ibb.co). Sırayla denenir.
 def hosts() -> list:
-    raw = os.getenv("IMAGE_HOSTS") or os.getenv("IMAGE_HOST") or "litterbox,catbox,imgbb"
+    raw = os.getenv("IMAGE_HOSTS") or os.getenv("IMAGE_HOST") or "github,litterbox,uguu,catbox,imgbb"
     return [h.strip() for h in raw.split(",") if h.strip()]
 
 
@@ -88,6 +124,10 @@ def public_url(path: str, rel_name: str, host: str = None) -> str:
             raise RuntimeError("IMAGE_HOST=static için PUBLIC_BASE_URL gerekli")
         return f"{base}/{rel_name}"
     stem = os.path.splitext(os.path.basename(path))[0]
+    if host == "github":
+        return _github_raw(path, rel_name)
+    if host == "uguu":
+        return _upload_uguu(prepare_jpeg(path), stem)
     if host in ("litterbox", "catbox"):
         return _upload_catbox(prepare_jpeg(path), stem, temporary=(host == "litterbox"))
     if host == "imgbb":
