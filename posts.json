@@ -4,13 +4,21 @@
     "files": [
       "001_cta.jpg"
     ],
-    "caption": "",
-    "hashtags": [],
+    "caption": "Reporting for duty: your new habit buddy is here to keep you on mission 🎖️ Download me free on Google Play, link in bio!",
+    "hashtags": [
+      "habitbuddy",
+      "selfcare",
+      "motivation",
+      "goaltracker",
+      "newapp",
+      "moodtracker",
+      "dailyhabits",
+      "digitalbuddy"
+    ],
     "platforms": [
       "instagram"
     ],
-    "approved": true,
-    "caption_error": "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CfWHzMPH4mZt6CcTzBNmd'}"
+    "approved": true
   },
   {
     "id": "002_quote.jpg",
