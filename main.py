@@ -388,6 +388,16 @@ def main() -> None:
     if args.scan:
         return scan(dry)
     if args.once:
+        # GitHub'ın kendi zamanlayıcısı saatlerce gecikebiliyor. Asıl tetik cron-job.org (tam saatinde);
+        # GitHub'ınki yedek: yakın zamanda zaten paylaşım yapıldıysa gecikmiş çalıştırma hiçbir şey yapmaz.
+        if os.getenv("GITHUB_EVENT_NAME") == "schedule":
+            gap_h = float(os.getenv("MIN_GAP_HOURS", "5"))
+            times = [parse_time(r["at"]) for rec in state["posts"].values() for r in rec.values()
+                     if r.get("status") == "done" and r.get("at")]
+            if times and datetime.now(TZ) - max(times) < timedelta(hours=gap_h):
+                log.info("Son paylaşım %s — %s saatten yeni, bu gecikmiş zamanlayıcı çalıştırması atlandı",
+                         max(times).strftime("%d.%m %H:%M"), gap_h)
+                return 0
         scan(dry, max_captions=-1)  # yeni postları listeye ekle (açıklamayı aşağıda sadece seçilene yazar)
         posts = load_posts()
         item, tried = None, set()
