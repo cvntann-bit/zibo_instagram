@@ -12,8 +12,10 @@
     "002_quote.jpg": {
       "instagram": {
         "attempts": 1,
-        "status": "failed",
-        "error": "{'message': 'Only photo or video can be accepted as media type.', 'type': 'OAuthException', 'code': 9004, 'error_subcode': 2207052, 'is_transient': False, 'error_user_title': \"Media download has failed. The media URI doesn't meet our requirements.\", 'error_user_msg': 'The media could not be fetched from this URI: https://i.ibb.co/27Nx3dpd/002-quote.jpg.Please check the limitations section in our development document for more information: https://developers.facebook.com/docs/instagram-platform/in"
+        "status": "done",
+        "error": "{'message': 'Only photo or video can be accepted as media type.', 'type': 'OAuthException', 'code': 9004, 'error_subcode': 2207052, 'is_transient': False, 'error_user_title': \"Media download has failed. The media URI doesn't meet our requirements.\", 'error_user_msg': 'The media could not be fetched from this URI: https://i.ibb.co/27Nx3dpd/002-quote.jpg.Please check the limitations section in our development document for more information: https://developers.facebook.com/docs/instagram-platform/in",
+        "media_id": "18037697909839071",
+        "at": "2026-09-29T05:33:31.939443+03:00"
       }
     },
     "350_guess.jpg": {
@@ -26,5 +28,5 @@
     }
   },
   "fired_slots": [],
-  "flip": 2
+  "flip": 3
 }
