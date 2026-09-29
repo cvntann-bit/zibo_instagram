@@ -46,13 +46,21 @@
     "files": [
       "003_quote.jpg"
     ],
-    "caption": "",
-    "hashtags": [],
+    "caption": "You don't have to be fine all the time, bud. Admitting it is a win too 💛",
+    "hashtags": [
+      "mentalhealth",
+      "selfcare",
+      "mindset",
+      "emotionalhealth",
+      "innerpeace",
+      "healingjourney",
+      "bekind",
+      "digitalbuddy"
+    ],
     "platforms": [
       "instagram"
     ],
-    "approved": true,
-    "caption_error": "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CfWHzNZDvktx2nNGYo5nR'}"
+    "approved": true
   },
   {
     "id": "004_module.jpg",
