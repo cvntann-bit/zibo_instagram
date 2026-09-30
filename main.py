@@ -65,6 +65,10 @@ AUTO_APPROVE = os.getenv("AUTO_APPROVE", "1") == "1"  # 0 ise üretilen açıkla
 CHECK_EVERY_SEC = 30
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
+VIDEO_EXT = {".mp4", ".mov"}
+REELS_SUBDIR = "reels"  # posts/reels/ içindeki her video ayrı bir Reels
+REELS_SLOTS = parse_slots(os.getenv("REELS_SLOTS", "21:00"))
+REELS_WINDOW_MIN = int(os.getenv("REELS_WINDOW_MIN", "40"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -102,6 +106,21 @@ def save_state(state: dict) -> None:
     _write_json(STATE_FILE, state)
 
 
+def is_video(name: str) -> bool:
+    return os.path.splitext(name)[1].lower() in VIDEO_EXT
+
+
+def is_reel(item: dict) -> bool:
+    return is_video(item_files(item)[0])
+
+
+def note_path_for(first: str) -> str:
+    """Postun açıklama ipucu dosyası: foto/video ile aynı adda .txt, klasör postlarında not.txt."""
+    if "/" in first and not first.startswith(REELS_SUBDIR + "/"):
+        return os.path.join(POSTS_DIR, first.split("/")[0], "not.txt")
+    return os.path.join(POSTS_DIR, os.path.splitext(first)[0] + ".txt")
+
+
 def is_image(name: str) -> bool:
     return os.path.splitext(name)[1].lower() in IMAGE_EXT
 
@@ -135,6 +154,11 @@ def discover() -> list:
             stem = os.path.splitext(name)[0]
             note_path = os.path.join(POSTS_DIR, stem + ".txt")
             found.append({"id": name, "files": [name], "note_path": note_path})
+        elif os.path.isdir(full) and name == REELS_SUBDIR:
+            for v in sorted(os.listdir(full)):
+                if is_video(v):
+                    rel = f"{name}/{v}"
+                    found.append({"id": rel, "files": [rel], "note_path": note_path_for(rel)})
         elif os.path.isdir(full):
             imgs = sorted(f for f in os.listdir(full) if is_image(f))[:10]
             if imgs:
@@ -166,7 +190,7 @@ def scan(dry_run: bool, max_captions: int = 0) -> None:
             posts.append(item)
             by_id[item["id"]] = item
             changed = True
-            log.info("Yeni gönderi bulundu: %s (%d foto)", item["id"], len(item["files"]))
+            log.info("Yeni gönderi bulundu: %s (%d dosya)", item["id"], len(item["files"]))
 
         if item.get("caption"):
             continue
@@ -180,8 +204,7 @@ def scan(dry_run: bool, max_captions: int = 0) -> None:
             log.info("[DRY] %s için açıklama üretilecek (not: %s)", item["id"], note or "-")
             continue
         try:
-            import captioner
-            gen = captioner.generate([os.path.join(POSTS_DIR, f) for f in item_files(item)], note)
+            gen = _generate_caption(item, note)
             item["caption"], item["hashtags"] = gen["caption"], gen["hashtags"]
             item.pop("caption_error", None)
             changed = True
@@ -213,16 +236,17 @@ def pending_platforms(item: dict, state: dict) -> list:
 QUEUE_ORDER = os.getenv("QUEUE_ORDER", "zigzag")  # zigzag | sirali | karisik
 
 
-def pick_next(posts: list, state: dict, skip=()):
-    """Paylaşılacak sıradaki post. zigzag: bir baştan (eski), bir sondan (yeni) sırayla."""
+def pick_next(posts: list, state: dict, skip=(), reels: bool = False):
+    """Paylaşılacak sıradaki post. zigzag: bir baştan (eski), bir sondan (yeni) sırayla.
+    reels=True: sadece videolar, dosya adı sırasıyla."""
     import random
     cands = [i for i in posts
-             if not i.get("publish_at") and i.get("approved", True) and i["id"] not in skip
+             if is_reel(i) == reels and not i.get("publish_at") and i.get("approved", True) and i["id"] not in skip
              and i.get("caption_attempts", 0) < MAX_ATTEMPTS and pending_platforms(i, state)
              and all(os.path.isfile(os.path.join(POSTS_DIR, f)) for f in item_files(i))]
     if not cands:
         return None
-    if QUEUE_ORDER == "sirali":
+    if reels or QUEUE_ORDER == "sirali":
         return cands[0]
     if QUEUE_ORDER == "karisik":
         return random.choice(cands)
@@ -237,11 +261,8 @@ def ensure_caption(item: dict, posts: list, dry_run: bool) -> bool:
         log.info("[DRY] %s için açıklama üretilecek", item["id"])
         return False
     try:
-        import captioner
-        first = item_files(item)[0]
-        note = item.get("note") or _read_note(os.path.join(POSTS_DIR, os.path.splitext(first)[0] + ".txt")) \
-            if "/" not in first else _read_note(os.path.join(POSTS_DIR, first.split("/")[0], "not.txt"))
-        gen = captioner.generate([os.path.join(POSTS_DIR, f) for f in item_files(item)], note)
+        note = item.get("note") or _read_note(note_path_for(item_files(item)[0]))
+        gen = _generate_caption(item, note)
         item["caption"], item["hashtags"] = gen["caption"], gen["hashtags"]
         item.pop("caption_error", None)
         log.info("Açıklama üretildi: %s -> %s", item["id"], gen["caption"][:60])
@@ -253,6 +274,44 @@ def ensure_caption(item: dict, posts: list, dry_run: bool) -> bool:
         ok = False
     _write_json(POSTS_JSON, posts)
     return ok
+
+
+def _video_frame(video_path: str) -> str:
+    """Videonun ortasından bir kare alır (Claude videoyu izleyemez, kareye bakar). Olmazsa ''."""
+    import subprocess
+    import tempfile
+    out = os.path.join(tempfile.gettempdir(), "zibo_frame.jpg")
+    try:
+        dur = float(subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video_path],
+            capture_output=True, text=True, timeout=60).stdout.strip() or 0)
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", str(max(dur / 2, 0)), "-i", video_path,
+                        "-frames:v", "1", out], check=True, timeout=120)
+        return out if os.path.isfile(out) else ""
+    except Exception as e:
+        log.warning("Videodan kare alınamadı (%s): %s", video_path, e)
+        return ""
+
+
+def _generate_caption(item: dict, note: str) -> dict:
+    import captioner
+    if is_reel(item):
+        frame = _video_frame(os.path.join(POSTS_DIR, item_files(item)[0]))
+        hint = ("This is an Instagram Reels video; the image is one frame from it. Write a Reels caption. "
+                "Follow the brief below for content, but ALWAYS answer in the JSON format requested at the end.")
+        note = f"{hint} {note}".strip()
+        return captioner.generate([frame] if frame else [], note)
+    return captioner.generate([os.path.join(POSTS_DIR, f) for f in item_files(item)], note)
+
+
+def reels_time(now: datetime) -> bool:
+    """Şu an Reels saati mi? (cron-job.org 21:00'de tetikler, 40 dk pay)"""
+    for slot in REELS_SLOTS:
+        h, m = map(int, slot.split(":"))
+        start = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if start <= now < start + timedelta(minutes=REELS_WINDOW_MIN):
+            return True
+    return False
 
 
 def next_queue_item(posts: list, state: dict):
@@ -286,6 +345,16 @@ def publish_to(platform: str, item: dict, dry_run: bool) -> str:
         from instagram import InstagramClient
         ig = InstagramClient(os.getenv("IG_USER_ID", ""), os.environ["IG_ACCESS_TOKEN"],
                              os.getenv("IG_API_VERSION", "v23.0"))
+        if is_reel(item):
+            path = os.path.join(POSTS_DIR, files[0])
+            try:
+                return ig.publish_reel(path, caption)  # dosyayı doğrudan Instagram'a yükler
+            except Exception as e:
+                url = images.github_raw_url(files[0])
+                if not url:
+                    raise
+                log.warning("Doğrudan yükleme olmadı (%s), GitHub linkiyle deneniyor", str(e)[:200])
+                return ig.publish_reel_url(url, caption)
         # Instagram fotoğrafı bir siteden indiremezse (2207052 / "could not be fetched") sıradaki siteyle dene
         last_err = None
         for host in images.hosts():
@@ -377,6 +446,7 @@ def main() -> None:
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--reels", action="store_true", help="--once ile: fotoğraf yerine sıradaki Reels'i paylaş")
     args = ap.parse_args()
     dry = args.dry_run or os.getenv("DRY_RUN") == "1"
     state = load_state()
@@ -390,10 +460,13 @@ def main() -> None:
     if args.once:
         # GitHub'ın kendi zamanlayıcısı saatlerce gecikebiliyor. Asıl tetik cron-job.org (tam saatinde);
         # GitHub'ınki yedek: yakın zamanda zaten paylaşım yapıldıysa gecikmiş çalıştırma hiçbir şey yapmaz.
-        if os.getenv("GITHUB_EVENT_NAME") == "schedule":
+        scheduled = os.getenv("GITHUB_EVENT_NAME") == "schedule"
+        # Reels: --reels verildiyse ya da cron-job.org Reels saatinde (21:00) tetiklediyse
+        reels = args.reels or (not scheduled and reels_time(datetime.now(TZ)))
+        if scheduled:
             gap_h = float(os.getenv("MIN_GAP_HOURS", "5"))
-            times = [parse_time(r["at"]) for rec in state["posts"].values() for r in rec.values()
-                     if r.get("status") == "done" and r.get("at")]
+            times = [parse_time(r["at"]) for pid, rec in state["posts"].items() for r in rec.values()
+                     if r.get("status") == "done" and r.get("at") and not is_video(pid)]
             if times and datetime.now(TZ) - max(times) < timedelta(hours=gap_h):
                 log.info("Son paylaşım %s — %s saatten yeni, bu gecikmiş zamanlayıcı çalıştırması atlandı",
                          max(times).strftime("%d.%m %H:%M"), gap_h)
@@ -402,7 +475,7 @@ def main() -> None:
         posts = load_posts()
         item, tried = None, set()
         for _ in range(3):  # açıklaması üretilemezse başka bir post dene
-            cand = pick_next(posts, state, tried)
+            cand = pick_next(posts, state, tried, reels=reels)
             if not cand:
                 break
             if ensure_caption(cand, posts, dry):
@@ -410,10 +483,13 @@ def main() -> None:
                 break
             tried.add(cand["id"])
         if not item:
-            log.info("Kuyrukta hazır gönderi yok")
+            log.info("Kuyrukta hazır %s yok", "Reels" if reels else "gönderi")
             return 0
-        log.info("Sıra (%s, %s): %s", QUEUE_ORDER, "sondan" if state.get("flip", 0) % 2 else "baştan", item["id"])
-        if not dry:
+        if reels:
+            log.info("Reels sırası: %s", item["id"])
+        else:
+            log.info("Sıra (%s, %s): %s", QUEUE_ORDER, "sondan" if state.get("flip", 0) % 2 else "baştan", item["id"])
+        if not dry and not reels:
             state["flip"] = state.get("flip", 0) + 1
             save_state(state)
         post_item(item, state, dry)

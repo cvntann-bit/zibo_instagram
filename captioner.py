@@ -55,9 +55,18 @@ def _encode(path: str, max_side: int = 1568) -> dict:
 
 def _parse(text: str) -> dict:
     match = re.search(r"\{.*\}", text, re.S)
-    if not match:
-        raise ValueError(f"Model JSON döndürmedi: {text[:200]}")
-    data = json.loads(match.group(0))
+    data = None
+    if match:
+        try:
+            data = json.loads(match.group(0))
+        except ValueError:
+            data = None
+    if data is None:  # model düz metin döndürdüyse: hashtag'leri ayıkla, gerisi açıklama
+        tags = re.findall(r"#(\w+)", text)
+        caption = re.sub(r"(\s*#\w+)+\s*$", "", text.strip()).strip()
+        if not caption:
+            raise ValueError(f"Model açıklama döndürmedi: {text[:200]}")
+        data = {"caption": caption, "hashtags": tags}
     tags = [re.sub(r"[^\w]", "", t.lstrip("#").lower()) for t in data.get("hashtags", [])]
     return {"caption": data.get("caption", "").strip(), "hashtags": [t for t in tags if t]}
 

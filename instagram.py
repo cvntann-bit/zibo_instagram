@@ -112,6 +112,17 @@ class InstagramClient:
         self._wait_until_ready(container_id)
         return self._publish(container_id)
 
+    def publish_reel_url(self, video_url: str, caption: str, share_to_feed: bool = True) -> str:
+        """Reels: Instagram videoyu verilen linkten indirir."""
+        data = self._check(requests.post(
+            f"{self.graph}/{self.ig_user_id}/media",
+            data={"media_type": "REELS", "video_url": video_url, "caption": caption,
+                  "share_to_feed": str(share_to_feed).lower(), "access_token": self.token},
+            timeout=60,
+        ))
+        self._wait_until_ready(data["id"])
+        return self._publish(data["id"])
+
     def publish_image(self, image_url: str, caption: str) -> str:
         data = self._check(requests.post(
             f"{self.graph}/{self.ig_user_id}/media",

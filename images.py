@@ -92,6 +92,20 @@ def _upload_uguu(data: bytes, name: str) -> str:
         raise RuntimeError(f"uguu yükleme hatası: HTTP {resp.status_code} {resp.text[:120]}")
 
 
+def github_raw_url(rel_name: str) -> str:
+    """posts/ içindeki dosyanın herkese açık GitHub linki (depo public ise), yoksa ''."""
+    repo = os.getenv("GITHUB_REPOSITORY")
+    if not repo:
+        return ""
+    ref = os.getenv("GITHUB_SHA") or "main"
+    posts_dir = os.getenv("POSTS_DIR", "posts").strip("/")
+    url = f"https://raw.githubusercontent.com/{repo}/{ref}/{quote(posts_dir + '/' + rel_name)}"
+    try:
+        return url if requests.head(url, timeout=30).status_code == 200 else ""
+    except requests.RequestException:
+        return ""
+
+
 def _github_raw(path: str, rel_name: str) -> str:
     """Depo herkese açıksa (public) fotoğraf doğrudan GitHub'dan verilir. En güvenilir yol."""
     repo = os.getenv("GITHUB_REPOSITORY")
