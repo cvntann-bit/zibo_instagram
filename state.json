@@ -449,6 +449,13 @@
         "media_id": "18079323863453745",
         "at": "2026-10-17T20:01:28.174434+03:00"
       }
+    },
+    "reels/zibo_reel_17_reveal_box.mp4": {
+      "instagram": {
+        "attempts": 1,
+        "status": "failed",
+        "error": "Container ERROR: ERROR"
+      }
     }
   },
   "fired_slots": [],
