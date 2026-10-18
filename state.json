@@ -453,8 +453,10 @@
     "reels/zibo_reel_17_reveal_box.mp4": {
       "instagram": {
         "attempts": 1,
-        "status": "failed",
-        "error": "Container ERROR: ERROR"
+        "status": "done",
+        "error": "Container ERROR: ERROR",
+        "media_id": "18095317274145810",
+        "at": "2026-10-18T21:01:38.731601+03:00"
       }
     },
     "021_quote.jpg": {
