@@ -882,6 +882,13 @@
         "media_id": "18077443877728996",
         "at": "2026-11-04T20:03:16.483228+03:00"
       }
+    },
+    "reels/zibo_reel_34_tip_tips.mp4": {
+      "instagram": {
+        "attempts": 1,
+        "status": "failed",
+        "error": "Container ERROR: ERROR"
+      }
     }
   },
   "fired_slots": [],
