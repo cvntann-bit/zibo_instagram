@@ -889,8 +889,16 @@
         "status": "failed",
         "error": "Container ERROR: ERROR"
       }
+    },
+    "312_save.jpg": {
+      "instagram": {
+        "attempts": 0,
+        "status": "done",
+        "media_id": "18115462832130728",
+        "at": "2026-11-05T01:32:15.669366+03:00"
+      }
     }
   },
   "fired_slots": [],
-  "flip": 77
+  "flip": 78
 }
