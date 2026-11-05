@@ -886,8 +886,10 @@
     "reels/zibo_reel_34_tip_tips.mp4": {
       "instagram": {
         "attempts": 1,
-        "status": "failed",
-        "error": "Container ERROR: ERROR"
+        "status": "done",
+        "error": "Container ERROR: ERROR",
+        "media_id": "18115298285599950",
+        "at": "2026-11-05T21:12:09.601267+03:00"
       }
     },
     "312_save.jpg": {
