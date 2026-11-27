@@ -1553,8 +1553,15 @@
         "status": "failed",
         "error": "{'message': 'Error validating access token: Session has expired on Friday, 27-Nov-26 04:39:37 PST. The current time is Friday, 27-Nov-26 10:01:08 PST.', 'type': 'OAuthException', 'code': 190, 'error_subcode': 0, 'fbtrace_id': 'AIdFNy36-IE31MlJTtTlvO4'}"
       }
+    },
+    "070_quote.jpg": {
+      "instagram": {
+        "attempts": 1,
+        "status": "failed",
+        "error": "{'message': 'Error validating access token: Session has expired on Friday, 27-Nov-26 04:39:37 PST. The current time is Friday, 27-Nov-26 15:01:18 PST.', 'type': 'OAuthException', 'code': 190, 'error_subcode': 0, 'fbtrace_id': 'ATVffHXVkNmYU7gXpoizhHD'}"
+      }
     }
   },
   "fired_slots": [],
-  "flip": 138
+  "flip": 139
 }
